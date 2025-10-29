@@ -1,0 +1,30 @@
+services:
+  sdwan-cidr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sdwan-cidr
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - default
+      - traefik_proxy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.http.routers.${TRAEFIK_SERVICE}.entrypoints=https"
+      - "traefik.http.routers.${TRAEFIK_SERVICE}.rule=Host(`${TRAEFIK_URL}`)"
+      - "traefik.http.services.${TRAEFIK_SERVICE}-service.loadbalancer.passhostheader=true"
+      - "traefik.http.services.${TRAEFIK_SERVICE}-service.loadbalancer.server.port=${TRAEFIK_PORT}"
+      - "traefik.http.services.${TRAEFIK_SERVICE}-service.loadbalancer.server.scheme=${TRAEFIK_SCHEME}"
+      - "traefik.http.routers.${TRAEFIK_SERVICE}.tls=true"
+      - "traefik.http.routers.${TRAEFIK_SERVICE}.middlewares=public-chain@file"
+
+networks:
+  default:
+  traefik_proxy:
+    external: true
