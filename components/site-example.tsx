@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Laptop, MonitorSmartphone, Server } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CIDRMath } from "@/lib/cidr-math";
 import type { AllocationResult } from "@/lib/hierarchical-allocator";
@@ -33,6 +33,7 @@ interface SiteExampleProps {
   regionThemes: { name: string; code: string }[];
 }
 
+// Helper logic for calculating the specific breakdown
 function buildSiteExample(
   allocation: AllocationResult,
   defaultVlanPrefix: number,
@@ -100,7 +101,7 @@ function buildSiteExample(
 
   let warning: string | undefined;
   if (allocatedVlans < vlansPerSite) {
-    warning = `With your per-VLAN sizes, only ${allocatedVlans} of ${vlansPerSite} VLANs fit in the /${sitePrefix} site block.`;
+    warning = `Capacity Limit: Only ${allocatedVlans} of ${vlansPerSite} VLANs fit in the /${sitePrefix} site block.`;
   } else {
     const minVlanSize = prefixes.reduce<bigint>((min, p) => {
       const size = CIDRMath.subnetAddressCount(p);
@@ -108,7 +109,7 @@ function buildSiteExample(
     }, BigInt(0));
 
     if (minVlanSize > BigInt(0) && remainingAddresses > BigInt(0) && remainingAddresses < minVlanSize * BigInt(2)) {
-      warning = `Per-site VLAN layout is close to capacity; only ${CIDRMath.formatSize(remainingAddresses)} addresses remain in the site block.`;
+      warning = `High Utilization: Only ${CIDRMath.formatSize(remainingAddresses)} addresses remain in the site block.`;
     }
   }
 
@@ -122,14 +123,8 @@ function buildSiteExample(
   };
 }
 
-export function SiteExample({
-  allocation,
-  vlanSize,
-  vlansPerSite,
-  vlanPrefixes,
-  updateVlanPrefix,
-  regionThemes,
-}: SiteExampleProps) {
+export function SiteExample(props: SiteExampleProps) {
+  const { allocation, vlanSize, vlansPerSite, vlanPrefixes, updateVlanPrefix, regionThemes } = props;
   const siteExample = buildSiteExample(allocation, vlanSize, vlansPerSite, vlanPrefixes);
 
   if (!siteExample) return null;
@@ -138,48 +133,36 @@ export function SiteExample({
   const exampleSiteId = theme ? `${theme.code}-S001` : "XXX-S001";
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-slide-up">
-      {/* Region and Site Codes */}
-      <Card className="border-border hover:shadow-md transition-all">
-        <CardHeader className="border-b bg-gradient-subtle">
-          <CardTitle className="text-sm uppercase tracking-wider">
-            Region & Site Codes
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Configuration Column */}
+      <Card className="lg:col-span-1 border-border/50 bg-card/40 backdrop-blur-sm shadow-lg flex flex-col pt-2">
+      <CardHeader className="bg-muted/20 m-4 p-4 rounded-xl">
+          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            VLAN Configuration
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 pt-6">
-          <div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Regions use astronomy names with shortcodes.
-            </p>
-            {theme && (
-              <>
-                <p className="font-mono text-sm bg-muted/50 px-3 py-2 rounded border mb-2">
-                  {theme.name} — <span className="text-primary font-semibold">{theme.code}</span>
-                </p>
-                <p className="font-mono text-sm bg-muted/50 px-3 py-2 rounded border">
-                  Example site ID: <span className="text-primary font-semibold">{exampleSiteId}</span>
-                </p>
-              </>
-            )}
+        <CardContent className="space-y-6 pt-6 flex-1 flex flex-col">
+          <div className="space-y-2">
+             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Site ID Format</div>
+             <div className="p-3 rounded-md bg-muted/40 font-mono text-sm border border-border/50 text-center">
+                 {exampleSiteId}
+             </div>
           </div>
 
           {vlanPrefixes.length > 0 && (
-            <div className="pt-4 border-t space-y-3">
-              <div>
-                <h4 className="text-sm font-semibold mb-1">Per-VLAN Size Bias</h4>
-                <p className="text-xs text-muted-foreground">
-                  Adjust individual VLAN prefix lengths within the site block. Smaller prefix = larger VLAN.
-                </p>
+            <div className="space-y-4 flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Custom Subnet Sizes</span>
+                  <Badge variant="outline" className="text-[10px] bg-background/50">Adjustable</Badge>
               </div>
-              <ScrollArea className="h-72">
-                <div className="space-y-3 pr-3">
+              
+              <ScrollArea className="flex-1 h-[300px] -mr-4 pr-4">
+                <div className="space-y-5 pb-4">
                   {vlanPrefixes.map((prefix, index) => (
-                    <div key={index} className="space-y-1.5 p-3 bg-muted/30 rounded-lg border">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-medium">VLAN {index + 1}</span>
-                        <span className="font-mono text-primary">
-                          /{prefix} · {CIDRMath.formatSize(CIDRMath.usableHosts(prefix))} hosts
-                        </span>
+                    <div key={index} className="space-y-2.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground font-medium">VLAN {index + 1}</span>
+                        <span className="font-mono text-primary bg-primary/10 px-1.5 rounded">/{prefix}</span>
                       </div>
                       <Slider
                         value={[prefix]}
@@ -189,16 +172,18 @@ export function SiteExample({
                         step={1}
                         className="w-full"
                       />
+                      <div className="text-[10px] text-right text-muted-foreground font-mono">
+                        {CIDRMath.formatSize(CIDRMath.usableHosts(prefix))} usable hosts
+                      </div>
                     </div>
                   ))}
                 </div>
               </ScrollArea>
+              
               {siteExample.warning && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    {siteExample.warning}
-                  </AlertDescription>
+                <Alert variant="destructive" className="text-xs py-3 bg-destructive/10 border-destructive/20">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  <AlertDescription className="ml-2">{siteExample.warning}</AlertDescription>
                 </Alert>
               )}
             </div>
@@ -206,47 +191,41 @@ export function SiteExample({
         </CardContent>
       </Card>
 
-      {/* Site Template Example */}
-      <Card className="border-border hover:shadow-md transition-all">
-        <CardHeader className="border-b bg-gradient-subtle">
-          <CardTitle className="text-sm uppercase tracking-wider">
-            Site Template Example
+      {/* Visualization Column */}
+      <Card className="lg:col-span-2 border-border/50 bg-card/40 backdrop-blur-sm shadow-lg pt-2">
+        <CardHeader className="m-4 p-4 bg-muted/10 flex flex-row justify-between items-center rounded-xl">
+          <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            Site Blueprint
           </CardTitle>
+          <Badge variant="secondary" className="font-mono text-xs border-primary/20 bg-primary/5 text-primary">
+            {siteExample.cidr}
+          </Badge>
         </CardHeader>
-        <CardContent className="space-y-4 pt-6">
-          <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-            <p className="font-mono text-sm font-semibold text-primary">{siteExample.cidr}</p>
-            <p className="text-xs text-muted-foreground mt-1">{siteExample.addressRange}</p>
-          </div>
-          
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold">VLANs ({siteExample.vlans.length})</h4>
-            <ScrollArea className="h-96">
-              <div className="grid grid-cols-1 gap-2.5 pr-3">
-                {siteExample.vlans.map((vlan, index) => (
-                  <div
-                    key={vlan.cidr}
-                    className="p-3 bg-muted/50 rounded-md border hover:border-primary/50 transition-colors"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase">
-                        VLAN {index + 1}
-                      </span>
-                      <Badge variant="outline" className="text-xs font-mono">
-                        {vlan.usableHosts} hosts
-                      </Badge>
-                    </div>
-                    <p className="font-mono text-sm font-semibold text-primary mb-1">
-                      {vlan.cidr}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {vlan.addressRange}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
+        <CardContent className="pt-6">
+            <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {siteExample.vlans.map((vlan, index) => (
+                        <div key={vlan.cidr} className="group relative overflow-hidden rounded-xl border bg-background/50 p-4 transition-all hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5">
+                            <div className="absolute right-0 top-0 p-3 opacity-5 group-hover:opacity-100 transition-opacity duration-500">
+                                {index === 0 ? <Server className="w-10 h-10 text-primary" /> : 
+                                 index === 1 ? <MonitorSmartphone className="w-10 h-10 text-primary" /> :
+                                 <Laptop className="w-10 h-10 text-primary" />}
+                            </div>
+                            <div className="flex justify-between items-center mb-3 relative z-10">
+                                <Badge variant="outline" className="bg-primary/5 border-primary/10 text-primary text-[10px] font-bold">VLAN {index + 1}</Badge>
+                                <span className="text-[10px] font-mono text-muted-foreground font-medium">{vlan.usableHosts} hosts</span>
+                            </div>
+                            <div className="font-mono text-base font-bold tracking-tight relative z-10">{vlan.cidr}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono mt-1.5 truncate relative z-10 opacity-80">
+                                {vlan.addressRange}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="p-4 rounded-lg bg-muted/30 border border-dashed text-xs text-center text-muted-foreground">
+                    Remaining space in site block: {allocation.sitePrefixRecommendation < 30 ? "Available for future expansion" : "Fully Allocated"}
+                </div>
+            </div>
         </CardContent>
       </Card>
     </div>

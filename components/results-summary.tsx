@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Lightbulb, Copy, Check } from "lucide-react";
+import { Lightbulb, Copy, Check, PieChart, ShieldAlert, Activity } from "lucide-react";
 import type { AllocationResult } from "@/lib/hierarchical-allocator";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 interface ResultsSummaryProps {
   result: AllocationResult;
@@ -14,12 +15,6 @@ interface ResultsSummaryProps {
 
 export function ResultsSummary({ result, sitesNeeded }: ResultsSummaryProps) {
   const [copied, setCopied] = useState(false);
-
-  const getUtilizationColor = (percentage: number) => {
-    if (percentage > 80) return "text-destructive";
-    if (percentage > 60) return "text-orange-500";
-    return "text-emerald-500";
-  };
 
   const handleCopy = () => {
     const summary = {
@@ -36,33 +31,70 @@ export function ResultsSummary({ result, sitesNeeded }: ResultsSummaryProps) {
   const totalRatio = result.summary.regionBreakdown.reduce((acc, r) => acc + r.ratio, 0);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Warnings and Recommendations */}
+    <div className="space-y-6">
+      
+      {/* Action Bar */}
+      <div className="flex justify-between items-end mb-2">
+         <div className="space-y-1">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                Analysis Results
+            </h2>
+         </div>
+         <Button variant="outline" size="sm" onClick={handleCopy} className="gap-2 text-xs h-8">
+            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+            {copied ? "Copied" : "Export JSON"}
+         </Button>
+      </div>
+
+      {/* Metric Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard 
+            label="Site Prefix" 
+            value={`/${result.sitePrefixRecommendation}`} 
+            subtext={`${result.totalSubnetsPerSite} subnets capacity`}
+            highlight
+        />
+        <MetricCard 
+            label="Total Sites" 
+            value={result.totalSitesSupported.toLocaleString()} 
+            subtext="Global capacity"
+        />
+        <MetricCard 
+            label="Est. Utilization" 
+            value={`${result.utilizationPercentage.toFixed(1)}%`} 
+            subtext={`Based on ${sitesNeeded} sites`}
+            color={result.utilizationPercentage > 80 ? "text-destructive" : "text-emerald-500"}
+        />
+         <MetricCard 
+            label="Hierarchy Depth" 
+            value={`${result.summary.totalRegions}`} 
+            subtext={`${result.summary.totalSubRegions} Territories`}
+        />
+      </div>
+
+      {/* Alerts */}
       {(result.warnings || result.recommendations) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {result.warnings && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-5 w-5" />
-              <AlertTitle className="font-semibold">Warnings</AlertTitle>
+        <div className="grid grid-cols-1 gap-4">
+          {result.warnings && result.warnings.length > 0 && (
+            <Alert variant="destructive" className="bg-destructive/5 border-destructive/20 text-destructive dark:text-red-400">
+              <ShieldAlert className="h-5 w-5" />
+              <AlertTitle className="font-semibold mb-2">Constraints Exceeded</AlertTitle>
               <AlertDescription>
-                <ul className="list-disc list-inside space-y-1 mt-2 text-sm">
-                  {result.warnings.map((w, i) => (
-                    <li key={i}>{w}</li>
-                  ))}
+                 <ul className="list-disc list-inside space-y-1 text-sm opacity-90">
+                  {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               </AlertDescription>
             </Alert>
           )}
 
-          {result.recommendations && (
-            <Alert className="border-blue-500/20 bg-blue-500/5 text-blue-700 dark:text-blue-300">
+          {result.recommendations && result.recommendations.length > 0 && (
+            <Alert className="bg-blue-500/5 border-blue-500/20 text-blue-700 dark:text-blue-400">
               <Lightbulb className="h-5 w-5 text-blue-500" />
-              <AlertTitle className="font-semibold">Recommendations</AlertTitle>
+              <AlertTitle className="font-semibold mb-2">Optimization Tips</AlertTitle>
               <AlertDescription>
-                <ul className="list-disc list-inside space-y-1 mt-2 text-sm">
-                  {result.recommendations.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
+                <ul className="list-disc list-inside space-y-1 text-sm opacity-90">
+                  {result.recommendations.map((r, i) => <li key={i}>{r}</li>)}
                 </ul>
               </AlertDescription>
             </Alert>
@@ -70,178 +102,83 @@ export function ResultsSummary({ result, sitesNeeded }: ResultsSummaryProps) {
         </div>
       )}
 
-      {/* Header with Actions */}
-      <div className="flex justify-end gap-2">
-         <Button variant="outline" size="sm" onClick={handleCopy} className="gap-2">
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            {copied ? "Copied JSON" : "Copy JSON"}
-         </Button>
-      </div>
-
-      {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-border hover:shadow-md transition-all hover:-translate-y-0.5 group relative overflow-hidden">
-          <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardHeader className="pb-2 relative z-10">
-            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Site Prefix
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 relative z-10 space-y-3">
-            <div>
-                <div className="text-3xl font-bold text-primary">/{result.sitePrefixRecommendation}</div>
-                <p className="text-sm text-muted-foreground mt-1">
-                {result.totalSubnetsPerSite} VLANs capacity
-                </p>
-            </div>
-            <div className="space-y-1.5">
-                 <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                    <span>VLAN Utilization</span>
-                    <span>{Math.round((result.summary.vlansPerSite / result.totalSubnetsPerSite) * 100)}%</span>
-                 </div>
-                 <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                    <div 
-                        className={cn(
-                            "h-full rounded-full transition-all duration-500", 
-                            (result.summary.vlansPerSite / result.totalSubnetsPerSite) > 0.8 ? "bg-orange-500" : "bg-primary"
-                        )}
-                        style={{ width: `${Math.min(100, (result.summary.vlansPerSite / result.totalSubnetsPerSite) * 100)}%` }} 
-                    />
-                 </div>
-                 <p className="text-xs text-muted-foreground text-right">{result.summary.vlansPerSite} used</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border hover:shadow-md transition-all hover:-translate-y-0.5 group relative overflow-hidden">
-          <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardHeader className="pb-2 relative z-10">
-            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Total Sites
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 relative z-10">
-            <div className="text-3xl font-bold">
-              {result.totalSitesSupported.toLocaleString()}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">Across all regions</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border hover:shadow-md transition-all hover:-translate-y-0.5 group relative overflow-hidden">
-          <div className="absolute inset-0 bg-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardHeader className="pb-2 relative z-10">
-            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Utilization
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 relative z-10">
-            <div className={cn("text-3xl font-bold", getUtilizationColor(result.utilizationPercentage))}>
-              {result.utilizationPercentage.toFixed(1)}%
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Based on {sitesNeeded.toLocaleString()} sites needed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border hover:shadow-md transition-all hover:-translate-y-0.5 group relative overflow-hidden">
-          <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardHeader className="pb-2 relative z-10">
-            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Structure
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 relative z-10">
-            <div className="text-3xl font-bold">{result.summary.totalRegions}</div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {result.summary.totalSubRegions} territories
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Visual Breakdown */}
-      <Card className="border-border">
-        <CardHeader className="border-b bg-gradient-subtle">
+      {/* Region Visualizer */}
+      <Card className="overflow-hidden border-border/50 bg-card/40 backdrop-blur-sm shadow-lg pt-2">
+      <CardHeader className="bg-muted/20 m-4 p-4 rounded-xl">
           <div className="flex justify-between items-center">
-             <CardTitle>Regional Distribution</CardTitle>
-             <Badge variant="outline" className="font-mono">
-                Supernet: {result.hierarchy.cidr}
-             </Badge>
+             <div className="flex items-center gap-2">
+                 <PieChart className="w-4 h-4 text-muted-foreground" />
+                 <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Regional Distribution</CardTitle>
+             </div> 
+             <Badge variant="secondary" className="font-mono text-xs border-border">{result.hierarchy.cidr}</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-8">
           
-          {/* Supernet Visualization Bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                <span>Allocation Breakdown</span>
-                <span>100% Total Capacity</span>
-            </div>
-            <div className="h-6 w-full bg-muted/50 rounded-full overflow-hidden flex border shadow-inner">
+          {/* Percentage Bar */}
+          <div className="space-y-3">
+            <div className="flex h-8 w-full overflow-hidden rounded-md bg-muted/30 shadow-inner">
                 {result.summary.regionBreakdown.map((r, i) => (
                     <div 
                         key={i}
-                        className="h-full first:bg-yellow-500 even:bg-orange-500 odd:bg-blue-500 hover:opacity-80 transition-opacity relative group border-r border-background/20 last:border-r-0"
-                        style={{ width: `${r.percentage}%` }}
+                        className={cn("h-full transition-all hover:brightness-110 relative group cursor-help border-r border-background/20 last:border-0")}
+                        style={{ 
+                            width: `${r.percentage}%`, 
+                            backgroundColor: `hsl(${220 + (i * 40)}, 85%, 55%)` 
+                        }}
                         title={`${r.name}: ${r.percentage.toFixed(1)}%`}
                     >
                     </div>
                 ))}
-                {result.summary.regionBreakdown.reduce((acc, r) => acc + r.percentage, 0) < 100 && (
-                   <div className="h-full bg-muted-foreground/5" style={{ flex: 1 }} title="Unallocated" />
-                )}
+            </div>
+             <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                <span>0% Address Space</span>
+                <span>100%</span>
             </div>
           </div>
 
-          {/* Grid of Region Cards */}
+          {/* Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
              {result.summary.regionBreakdown.map((r, i) => {
                  const projectedSites = Math.ceil(sitesNeeded * (r.ratio / totalRatio));
                  const utilization = Math.min(100, (projectedSites / r.sitesCapacity) * 100);
-                 const isFull = utilization > 90;
+                 const color = `hsl(${220 + (i * 40)}, 85%, 55%)`;
+                 const isHighUtil = utilization > 90;
 
                  return (
-                    <div key={i} className="group flex flex-col p-4 rounded-xl bg-card border hover:border-primary/30 hover:shadow-md transition-all">
-                        <div className="flex justify-between items-start mb-3">
-                             <div className="space-y-1">
-                                <div className="font-semibold text-base">{r.name}</div>
-                                <Badge variant="outline" className="font-mono text-xs bg-muted/50">
-                                    {r.cidr}
-                                </Badge>
+                    <div key={i} className="relative overflow-hidden rounded-xl border bg-background/50 p-4 hover:bg-background hover:shadow-md transition-all group hover:border-primary/30">
+                        <div className="absolute left-0 top-0 h-full w-1 transition-all group-hover:w-1.5" style={{ backgroundColor: color }} />
+                        
+                        <div className="flex justify-between items-start mb-5 pl-2">
+                             <div>
+                                <div className="font-semibold text-sm">{r.name}</div>
+                                <div className="text-xs font-mono text-muted-foreground mt-0.5 bg-muted/50 px-1.5 py-0.5 rounded w-fit">{r.cidr}</div>
                              </div>
-                             <Badge variant="secondary" className="font-mono text-xs">
+                             <Badge variant="outline" className="text-[10px] font-mono bg-background/50">
                                 {r.percentage.toFixed(1)}%
                              </Badge>
                         </div>
 
-                        <div className="flex-1 space-y-4">
+                        <div className="pl-2 space-y-3">
                             <div className="space-y-1.5">
-                                <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                                    <span>Projected Utilization</span>
-                                    <span className={isFull ? "text-destructive" : "text-emerald-500"}>{utilization.toFixed(0)}%</span>
+                                <div className="flex justify-between text-[10px] uppercase text-muted-foreground font-semibold tracking-wide">
+                                    <span>Utilization</span>
+                                    <span className={isHighUtil ? "text-destructive" : "text-emerald-500"}>{utilization.toFixed(0)}%</span>
                                 </div>
-                                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                {/* FIX: We wrap the Shadcn Progress component and override the Indicator color using CSS variables or children if your component supports it. 
+                                    Alternatively, standard Shadcn doesn't support dynamic colors easily without a custom component. 
+                                    Here we simulate the progress bar manually to ensure color control without props errors. 
+                                */}
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-muted/50">
                                     <div 
-                                        className={cn(
-                                            "h-full rounded-full transition-all duration-500", 
-                                            isFull ? "bg-destructive" : "bg-emerald-500"
-                                        )}
-                                        style={{ width: `${utilization}%` }} 
+                                        className={cn("h-full w-full flex-1 transition-all", isHighUtil ? "bg-destructive" : "bg-emerald-500")} 
+                                        style={{ transform: `translateX(-${100 - (utilization || 0)}%)` }} 
                                     />
                                 </div>
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>{projectedSites.toLocaleString()} sites</span>
-                                    <span>{r.sitesCapacity.toLocaleString()} cap</span>
-                                </div>
                             </div>
-
-                             <div className="pt-3 border-t flex justify-between items-center text-xs text-muted-foreground">
-                                <span>Growth Ratio</span>
-                                <Badge variant="outline" className="bg-muted/30 font-mono text-xs">
-                                    {r.ratio}x
-                                </Badge>
+                             <div className="flex justify-between items-center text-xs text-muted-foreground pt-2 border-t border-dashed">
+                                <span>Proj. Sites: <span className="text-foreground font-medium">{projectedSites.toLocaleString()}</span></span>
+                                <span className="font-mono text-[10px]">Max: {r.sitesCapacity.toLocaleString()}</span>
                              </div>
                         </div>
                     </div>
@@ -252,4 +189,16 @@ export function ResultsSummary({ result, sitesNeeded }: ResultsSummaryProps) {
       </Card>
     </div>
   );
+}
+
+function MetricCard({ label, value, subtext, highlight, color }: any) {
+    return (
+        <Card className={cn("border-border/50 transition-all hover:-translate-y-1 hover:shadow-md bg-card/60", highlight && "bg-primary/5 border-primary/20")}>
+            <CardContent className="p-5">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">{label}</p>
+                <div className={cn("text-3xl font-bold mb-1 tracking-tight", color)}>{value}</div>
+                <p className="text-xs text-muted-foreground font-medium">{subtext}</p>
+            </CardContent>
+        </Card>
+    )
 }
