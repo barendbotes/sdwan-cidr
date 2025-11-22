@@ -60,6 +60,16 @@ export function HierarchyView({ result, regionThemes }: HierarchyViewProps) {
     return theme?.code || regionName.substring(0, 3).toUpperCase();
   };
 
+  // Helper to pad site IDs dynamically based on capacity
+  const formatSiteId = (code: string, subIndex: number, siteNum: number, maxSites: number) => {
+    // Determine padding length based on maxSites (e.g., 1000 -> 4 digits, 100 -> 3 digits)
+    const padding = maxSites.toString().length;
+    // Ensure minimum of 3 digits for aesthetics
+    const finalPadding = Math.max(3, padding); 
+    const paddedNum = siteNum.toString().padStart(finalPadding, '0');
+    return `${code}-T${subIndex + 1}-S${paddedNum}`;
+  };
+
   return (
     <Card className="border-border/50 shadow-xl bg-card/40 backdrop-blur-xl pt-2">
       <CardHeader className="bg-muted/20 m-4 p-4 rounded-xl">
@@ -128,11 +138,13 @@ export function HierarchyView({ result, regionThemes }: HierarchyViewProps) {
                         
                         // First Site
                         const firstSiteCidr = CIDRMath.getNthSubnet(subRegionIp, subRegionPrefix, sitePrefix, BigInt(0));
-                        const firstSiteId = `${regionCode}-T${subIndex + 1}-S001`;
+                        // Dynamic Padding applied here
+                        const firstSiteId = formatSiteId(regionCode, subIndex, 1, maxSites);
                         
                         // Last Site
                         const lastSiteCidr = CIDRMath.getNthSubnet(subRegionIp, subRegionPrefix, sitePrefix, BigInt(maxSites - 1));
-                        const lastSiteId = `${regionCode}-T${subIndex + 1}-S${maxSites}`;
+                        // Dynamic Padding applied here
+                        const lastSiteId = formatSiteId(regionCode, subIndex, maxSites, maxSites);
 
                         return (
                         <div

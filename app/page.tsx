@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, ArrowLeft, ArrowRight, Network, Moon, Sun } from "lucide-react";
@@ -26,6 +26,9 @@ const STEPS = ["Configure", "Analysis", "Hierarchy"];
 export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
   
+  // Scroll Anchor Ref
+  const topRef = useRef<HTMLDivElement>(null);
+
   // Configuration State
   const [supernet, setSupernet] = useState("10.0.0.0/8");
   const [regionCount, setRegionCount] = useState(4);
@@ -40,8 +43,23 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [vlanPrefixes, setVlanPrefixes] = useState<number[]>([]);
 
-  // Theme (requires Next-Themes provider in layout.tsx)
+  // Theme
   const { theme, setTheme } = useTheme();
+
+  // Smooth Scroll Effect
+  useEffect(() => {
+    // Only scroll if we are past the initial load (step 1), 
+    // or if we want to ensure step 1 is always visible at top on refresh
+    if (topRef.current) {
+        // A small timeout ensures the DOM has finished rendering the new step's height
+        setTimeout(() => {
+            topRef.current?.scrollIntoView({ 
+                behavior: "smooth", 
+                block: "start" 
+            });
+        }, 100);
+    }
+  }, [currentStep]);
 
   const updateRegionCount = (count: number) => {
     setRegionCount(count);
@@ -91,7 +109,6 @@ export default function Home() {
 
       const allocation = allocator.allocate();
       
-      // Reset custom VLAN prefixes only if logic suggests a fresh start
       if (vlanPrefixes.length !== vlansPerSite) {
          const initialPrefixes = Array.from({ length: vlansPerSite }, () => vlanSize);
          setVlanPrefixes(initialPrefixes);
@@ -111,7 +128,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300 selection:bg-primary/20 selection:text-primary">
-      {/* Modern Background Mesh */}
       <div className="fixed inset-0 -z-10 h-full w-full bg-background">
         <div className="absolute top-0 z-[-2] h-screen w-screen bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
         <div className="absolute bottom-0 left-0 z-[-2] h-[500px] w-[500px] rounded-full bg-primary/5 blur-3xl" />
@@ -146,8 +162,9 @@ export default function Home() {
           </Button>
         </div>
 
-        {/* Steps */}
-        <div className="mb-10">
+        {/* Steps Anchor - This is where we scroll to */}
+        {/* scroll-mt-6 ensures we leave a little gap at the top of the browser window */}
+        <div ref={topRef} className="mb-10 scroll-mt-6">
           <StepIndicator currentStep={currentStep} steps={STEPS} />
         </div>
 
@@ -196,14 +213,15 @@ export default function Home() {
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
                 <ResultsSummary result={result} sitesNeeded={sitesNeeded} />
 
-                <SiteExample
-                  allocation={result}
-                  vlanSize={vlanSize}
-                  vlansPerSite={vlansPerSite}
-                  vlanPrefixes={vlanPrefixes}
-                  updateVlanPrefix={updateVlanPrefix}
-                  regionThemes={REGION_THEMES}
-                />
+<SiteExample
+  allocation={result}
+  vlanSize={vlanSize}
+  vlansPerSite={vlansPerSite}
+  vlanPrefixes={vlanPrefixes}
+  updateVlanPrefix={updateVlanPrefix}
+  regionThemes={REGION_THEMES}
+  totalSites={sitesNeeded} // <--- Add this line
+/>
 
                 <div className="flex justify-between pt-6 border-t border-border/50">
                   <Button variant="ghost" onClick={() => setCurrentStep(1)} className="gap-2 hover:bg-secondary">

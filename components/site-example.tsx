@@ -29,6 +29,7 @@ interface SiteExampleProps {
   vlanSize: number;
   vlansPerSite: number;
   vlanPrefixes: number[];
+  totalSites: number; // Added this prop
   updateVlanPrefix: (index: number, prefix: number) => void;
   regionThemes: { name: string; code: string }[];
 }
@@ -124,13 +125,17 @@ function buildSiteExample(
 }
 
 export function SiteExample(props: SiteExampleProps) {
-  const { allocation, vlanSize, vlansPerSite, vlanPrefixes, updateVlanPrefix, regionThemes } = props;
+  const { allocation, vlanSize, vlansPerSite, vlanPrefixes, totalSites, updateVlanPrefix, regionThemes } = props;
   const siteExample = buildSiteExample(allocation, vlanSize, vlansPerSite, vlanPrefixes);
 
   if (!siteExample) return null;
 
   const theme = regionThemes[0];
-  const exampleSiteId = theme ? `${theme.code}-S001` : "XXX-S001";
+  
+  // Logic for dynamic padding
+  const paddingLength = Math.max(3, totalSites.toString().length);
+  const paddedId = "1".padStart(paddingLength, '0');
+  const exampleSiteId = theme ? `${theme.code}-S${paddedId}` : `XXX-S${paddedId}`;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -201,7 +206,7 @@ export function SiteExample(props: SiteExampleProps) {
             {siteExample.cidr}
           </Badge>
         </CardHeader>
-<CardContent className="pt-6">
+        <CardContent className="pt-6">
             <div className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {siteExample.vlans.map((vlan, index) => (
