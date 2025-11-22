@@ -18,12 +18,14 @@ export interface HierarchyLevel {
     sitePrefix?: number;
     ratio?: number;
     utilization?: number;
+    code?: string;
   };
 }
 
 export interface RegionBias {
   name: string;
   ratio: number;
+  code?: string;
 }
 
 export interface AllocationConfig {
@@ -53,6 +55,7 @@ export interface AllocationResult {
       sitesCapacity: number;
       percentage: number;
       cidr: string;
+      code?: string;
     }>;
   };
   warnings?: string[];
@@ -113,6 +116,7 @@ export class HierarchicalAllocator {
     name: string;
     prefix: number;
     ratio: number;
+    code?: string;
   }> {
     const { supernet, regionBiases } = this.config;
     const { prefix: supPrefix } = CIDRMath.parseCIDR(supernet);
@@ -128,6 +132,7 @@ export class HierarchicalAllocator {
         name: region.name,
         prefix: Math.floor(regionPrefix),
         ratio: region.ratio,
+        code: region.code,
       };
     });
   }
@@ -219,13 +224,28 @@ export class HierarchicalAllocator {
     // Level 2: Regions
     const regions: HierarchyLevel[] = [];
     const supernetBase = CIDRMath.ipToNumber(supernetNetwork);
-    let currentOffset = BigInt(0);
+    const supernetBroadcastNum = CIDRMath.ipToNumber(supernetBroadcast);
+    let currentIpNum = supernetBase;
 
     for (let i = 0; i < regionBiases.length; i++) {
       const regionInfo = regionalPrefixes[i];
       const regionSize = CIDRMath.subnetAddressCount(regionInfo.prefix);
 
-      const regionNetwork = CIDRMath.numberToIp(supernetBase + currentOffset);
+      // Align the region start to the next valid boundary for its prefix so
+      // that regions are strictly non-overlapping within the supernet.
+      let regionNetworkNum = currentIpNum;
+      const remainder = regionNetworkNum % regionSize;
+      if (remainder !== BigInt(0)) {
+        regionNetworkNum = regionNetworkNum - remainder + regionSize;
+      }
+
+      if (regionNetworkNum + regionSize - BigInt(1) > supernetBroadcastNum) {
+        throw new Error(
+          "Region allocation exceeds supernet capacity - adjust supernet or region ratios"
+        );
+      }
+
+      const regionNetwork = CIDRMath.numberToIp(regionNetworkNum);
       const broadcast = CIDRMath.getBroadcastAddress(
         regionNetwork,
         regionInfo.prefix
@@ -248,28 +268,29 @@ export class HierarchicalAllocator {
         usableHosts: CIDRMath.usableHosts(regionInfo.prefix),
         metadata: {
           ratio: regionInfo.ratio,
+          code: regionInfo.code,
         },
       });
 
-      currentOffset += regionSize;
+      currentIpNum = regionNetworkNum + regionSize;
     }
 
     hierarchy.children = regions;
 
     // Check for unallocated space
-    const totalAllocated = currentOffset;
     const totalAvailable = CIDRMath.subnetAddressCount(supernetPrefix);
+    const totalAllocated = currentIpNum - supernetBase;
 
     if (totalAllocated < totalAvailable) {
       const unallocatedSize = totalAvailable - totalAllocated;
-      const unallocatedNetwork = CIDRMath.numberToIp(
-        supernetBase + totalAllocated
-      );
+      const unallocatedNetworkNum = currentIpNum;
+      const unallocatedNetwork = CIDRMath.numberToIp(unallocatedNetworkNum);
 
       let unallocPrefix = supernetPrefix;
       while (unallocPrefix <= 30) {
         const size = CIDRMath.subnetAddressCount(unallocPrefix);
-        if (size <= unallocatedSize) break;
+        const remainder = unallocatedNetworkNum % size;
+        if (size <= unallocatedSize && remainder === BigInt(0)) break;
         unallocPrefix++;
       }
 
